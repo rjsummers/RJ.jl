@@ -2,6 +2,10 @@ module Networks
 
 using LinearAlgebra
 
+export SParameters
+export ZParameters
+export YParameters
+
 abstract type Network end
 
 """
@@ -10,16 +14,19 @@ abstract type Network end
 S-parameters of a network.
 """
 mutable struct SParameters <: Network
-    s::Array{ComplexF64}
-    f::Vector{Float64}
-    z0::Vector{ComplexF64}
-    nports::Int64
-    function SParameters(s::Array{<:Complex}, f::Array{<:Real}, z0::Array{<:Real})
+    s::Array{<:Number}
+    f::Vector{<:Real}
+    z0::Vector{<:Number}
+    nports::Int
+    function SParameters(s::Array{<:Number}, f::Array{<:Real}, z0::Array{<:Real})
         nports = size(s)[2]
         new(s, f, z0, nports)
     end
-    function SParameters(s::Array{<:Complex}, f::Array{<:Real}, z0::Real)
+    function SParameters(s::Array{<:Number}, f::Array{<:Real}, z0::Real)
         new(s, f, ones(size(s)[2]) .* z0)
+    end
+    function SParameters(s::Array{<:Number}, f::Array{<:Real})
+        new(s, f, ones(size(s)[2]) .* 50.0)
     end
 end
 
@@ -29,10 +36,10 @@ end
 ABCD-parameters of a network.
 """
 mutable struct ABCDParameters <: Network
-    abcd::Array{ComplexF64}
-    f::Vector{Float64}
-    nports::Int64
-    function ABCDParameters(abcd::Array{Complex}, f::Array{Real})
+    abcd::Array{<:Number}
+    f::Vector{<:Real}
+    nports::Int
+    function ABCDParameters(abcd::Array{<:Number}, f::Array{<:Real})
         nports = size(abcd)[2]
         new(abcd, f, nports)
     end
@@ -44,10 +51,10 @@ end
 Z-parameters of a network.
 """
 mutable struct ZParameters <: Network
-    z::Array{ComplexF64}
-    f::Vector{Float64}
-    nports::Int64
-    function ZParameters(z::Array{Complex}, f::Array{Real})
+    z::Array{<:Number}
+    f::Vector{<:Real}
+    nports::Int
+    function ZParameters(z::Array{<:Number}, f::Vector{<:Real})
         nports = size(z)[2]
         new(z, f, nports)
     end
@@ -59,10 +66,10 @@ end
 Y-parameters of a network.
 """
 mutable struct YParameters <: Network
-    y::Array{ComplexF64}
-    f::Vector{Float64}
-    nports::Int64
-    function YParameters(y::Array{Complex}, f::Array{Real})
+    y::Array{<:Number}
+    f::Vector{<:Real}
+    nports::Int
+    function YParameters(y::Array{<:Number}, f::Array{<:Real})
         nports = size(y)[2]
         new(y, f, nports)
     end
@@ -74,10 +81,10 @@ end
 H-parameters of a network.
 """
 mutable struct HParameters <: Network
-    h::Array{ComplexF64}
-    f::Vector{Float64}
-    nports::Int64
-    function HParameters(h::Array{Complex}, f::Array{Real})
+    h::Array{<:Number}
+    f::Vector{<:Real}
+    nports::Int
+    function HParameters(h::Array{<:Number}, f::Array{<:Real})
         nports = size(h)[2]
         new(h, f, nports)
     end
@@ -89,10 +96,10 @@ end
 G-parameters of a network.
 """
 mutable struct GParameters <: Network
-    g::Array{ComplexF64}
-    f::Vector{Float64}
-    nports::Int64
-    function GParameters(g::Array{Complex}, f::Array{Real})
+    g::Array{<:Number}
+    f::Vector{<:Real}
+    nports::Int
+    function GParameters(g::Array{<:Number}, f::Array{<:Real})
         nports = size(g)[2]
         new(g, f, nports)
     end
@@ -104,15 +111,15 @@ end
 T-parameters of a network.
 """
 mutable struct TParameters <: Network
-    t::Array{ComplexF64}
-    f::Vector{Float64}
-    z0::Vector{ComplexF64}
-    nports::Int64
-    function TParameters(t::Array{Complex}, f::Array{Real}, z0::Array{Real})
+    t::Array{<:Number}
+    f::Vector{<:Real}
+    z0::Vector{<:Number}
+    nports::Int
+    function TParameters(t::Array{<:Number}, f::Array{<:Real}, z0::Array{<:Real})
         nports = size(t)[2]
         new(t, f, nports)
     end
-    function TParameters(t::Array{Complex}, f::Array{Real}, z0::Real)
+    function TParameters(t::Array{<:Number}, f::Array{<:Real}, z0::Real)
         new(t, f, ones(size(t)[2]) .* z0)
     end
 end
@@ -208,7 +215,8 @@ Creates a two-port S-parameter network given four vectors
 for each parameter vs. frequency.
 """
 function SParameters(s11, s12, s21, s22, f; z0 = 50)
-    s = cat(cat(s11, s21, dims = 2), cat(s12, s22, dims = 2), dims = 3)
+    s = [[reshape(s11,1,1,:) reshape(s12,1,1,:)];
+        [reshape(s21,1,1,:) reshape(s22,1,1,:)]]
     SParameters(s, f, z0)
 end
 
@@ -305,12 +313,11 @@ end
 Converts a Z-Parameter object to an S-Parameter object.
 """
 function SParameters(z::ZParameters; z0 = 50)
-    s = zeros(z.z)
-    z0vec = z0 .* Vector(ones(size(z.z)[2]))
-    syarr = inv(I * sqrt.(z0vec))
-    for i = 1:size(z.z)[1]
-        s[i,:,:] = (syarr * z.z[i,:,:] * syarr - I) * inv(syarr * z.z[i,:,:] * syarr + I)
-    end
+    s = similar(z.z)
+    z0vec = z0 .* ones(size(z.z)[2])
+    syarr = diagm(inv.(sqrt.(z0vec)))
+
+    s = mapslices(z->(syarr*z*syarr-I)*inv(syarr*z*syarr+I), z.z, dims=(1,2))
     SParameters(s, copy(z.f), z0)
 end
 

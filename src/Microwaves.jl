@@ -7,6 +7,8 @@ include("Networks.jl")
 include("Amplifiers.jl")
 include("Radar.jl")
 
+export Networks
+
 function voltage_gain(x::Number, units::Symbol)
     if units == :power
         return sqrt(x)
