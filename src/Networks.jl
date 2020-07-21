@@ -26,7 +26,7 @@ mutable struct SParameters <: Network
         new(s, f, ones(size(s)[2]) .* z0)
     end
     function SParameters(s::Array{<:Number}, f::Array{<:Real})
-        new(s, f, 50.0)
+        new(s, f, ones(size(s)[2]) .* 50.0)
     end
 end
 
